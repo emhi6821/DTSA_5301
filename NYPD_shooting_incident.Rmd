@@ -1,0 +1,262 @@
+---
+title: "NYPD_shooting_incident"
+author: "Emily Hill"
+date: "11/14/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<center>
+
+This an RMD document analyzing NYPD shooting incidents. 
+
+First, we will import the dataset from a .csv file which can be found at [link](https://catalog.data.gov/dataset/nypd-shooting-incident-data-historic/resource/c564b578-fd8a-4005-8365-34150d306cc4). 
+
+The following is an overview of the dataset from The City of New York: 
+
+"This is a breakdown of every shooting incident that occurred in NYC going back to 2006 through the end of the previous calendar year. This data is manually extracted every quarter and reviewed by the Office of Management Analysis and Planning before being posted on the NYPD website. Each record represents a shooting incident in NYC and includes information about the event, the location and time of occurrence. In addition, information related to suspect and victim demographics is also included."
+
+## IMPORT
+
+The data was downloaded as a .csv to the listed directory from data.gov prior to completing this document. 
+```{r import_data, message = FALSE, echo = FALSE, warning = FALSE}
+library(tidyverse)
+library(lubridate)
+shooting_data <- read_csv("~/Documents/DTSA/DTSA5301/NYPD_shooting/Data/NYPD_Shooting_Incident_Data__Historic_.csv")
+shooting_data
+```
+
+Summary of Data:
+
+```{r sum_data}
+summary(shooting_data)
+
+```
+
+## TIDY
+
+-Turn Character Variables into Factors
+-Turn date variable into a date type object
+
+Data to remove:
+
+-Lon_lat
+-Longitude
+-Latitude
+-Y_COORD_CD
+-X_COORD_CD
+
+```{r tidy_data}
+cols <- c("BORO", "PRECINCT", "JURISDICTION_CODE", "LOCATION_DESC", "STATISTICAL_MURDER_FLAG", "PERP_AGE_GROUP", "PERP_SEX", "PERP_RACE", "VIC_AGE_GROUP", "VIC_SEX", "VIC_RACE") #columns to turn into factors
+shooting_data[cols] <- lapply(shooting_data[cols], factor) #change types of columns
+shooting_data <- shooting_data %>%
+  mutate(OCCUR_DATE = mdy(OCCUR_DATE)) %>%
+  select(-c(Lon_Lat, Latitude, Longitude, Y_COORD_CD, X_COORD_CD))
+```
+
+Summary of Tidied Data:
+
+```{r tidy_sum}
+summary(shooting_data)
+
+```
+
+## VISUALIZE
+
+-Group by date
+
+-Plot # of incidents per date
+
+```{r incident_by_date, warning = FALSE}
+incident_by_date <- shooting_data %>%
+  group_by(OCCUR_DATE) %>%
+  summarize(count_date = n())
+
+incident_by_date %>%
+  ggplot(aes(x = OCCUR_DATE, y = count_date)) + 
+  geom_line(aes(color = "incident count")) +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 90)) + labs(title = "NYPD Shooting Incidents", y = NULL)
+```
+
+This plot shows that there was a large increase in shooting incidents after 2020. 
+
+Now, look at the number of shooting incidents by month.
+
+-Group by month
+
+-Plot # of shooting incidents by month
+
+```{r incident_by_month, warning = FALSE}
+incident_by_month <- shooting_data %>%
+  group_by(month = format(OCCUR_DATE, "%m")) %>%
+  summarize(month_count = n())
+
+incident_by_month %>%
+  ggplot(aes(x = month, y = month_count)) + 
+  geom_point(aes(color = "Incidents per month")) +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 90)) + labs(title = "NYPD Shooting Incidents by month", y = NULL)
+```
+
+Plot shooting incidents by year.
+
+```{r incident_by_year, warning = FALSE}
+incident_by_year <- shooting_data %>%
+  group_by(year = format(OCCUR_DATE, "%y")) %>%
+  summarize(year_count = n())
+
+incident_by_year %>%
+  ggplot(aes(x = year, y = year_count)) + 
+  geom_point(aes(color = "Incidents per year")) +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 90)) + labs(title = "NYPD Shooting Incidents by Year", y = NULL)
+```
+
+
+It looks like there is a correlation between month and shooting incidents. 
+
+Analyze Victim and Perpetrator Data:
+
+-Group by Victim and Perpetrator Age, Race and Sex.
+
+-Create pie chart of each.
+
+```{r visualize_attributes, echo = FALSE, fig.show="hold", out.width="50%", warning = FALSE}
+
+vic_race_data <- shooting_data %>%
+  group_by(VIC_RACE) %>%
+  summarize(count = n())
+pie <- ggplot(vic_race_data, aes(x = "", y = count, fill=VIC_RACE)) +
+  geom_bar(stat = "identity", width = 1)
+pie <- pie + coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0(round(count/sum(vic_race_data$count)*100), "%")), position = position_stack(vjust = 0.5))
+pie = pie + labs(x = NULL, y = NULL, fill = NULL, title = "Victim Race")
+pie = pie + theme_classic() + theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          plot.title = element_text(hjust = 0.5, color = "#666666"))
+vic_race_pie <- pie
+vic_age_data <- shooting_data %>%
+  group_by(VIC_AGE_GROUP) %>%
+  summarize(count = n())
+pie <- ggplot(vic_age_data, aes(x = "", y = count, fill=VIC_AGE_GROUP)) +
+  geom_bar(stat = "identity", width = 1)
+pie <- pie + coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0(round(count/sum(vic_age_data$count)*100), "%")), position = position_stack(vjust = 0.5))
+pie = pie + labs(x = NULL, y = NULL, fill = NULL, title = "Victim Age")
+pie = pie + theme_classic() + theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          plot.title = element_text(hjust = 0.5, color = "#666666"))
+vic_age_pie <- pie
+vic_sex_data <- shooting_data %>%
+  group_by(VIC_SEX) %>%
+  summarize(count = n())
+pie <- ggplot(vic_sex_data, aes(x = "", y = count, fill=VIC_SEX)) +
+  geom_bar(stat = "identity", width = 1)
+pie <- pie + coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0(round(count/sum(vic_sex_data$count)*100), "%")), position = position_stack(vjust = 0.5))
+pie = pie + labs(x = NULL, y = NULL, fill = NULL, title = "Victim Sex")
+pie = pie + theme_classic() + theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          plot.title = element_text(hjust = 0.5, color = "#666666"))
+vic_sex_pie <- pie
+perp_race_data <- shooting_data %>%
+  group_by(PERP_RACE) %>%
+  summarize(count = n())
+pie <- ggplot(perp_race_data, aes(x = "", y = count, fill=PERP_RACE)) +
+  geom_bar(stat = "identity", width = 1)
+pie <- pie + coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0(round(count/sum(perp_race_data$count)*100), "%")), position = position_stack(vjust = 0.5))
+pie = pie + labs(x = NULL, y = NULL, fill = NULL, title = "Perpetrator Race")
+pie = pie + theme_classic() + theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          plot.title = element_text(hjust = 0.5, color = "#666666"))
+perp_race_pie <- pie
+perp_age_data <- shooting_data %>%
+  group_by(PERP_AGE_GROUP) %>%
+  summarize(count = n())
+pie <- ggplot(perp_age_data, aes(x = "", y = count, fill=PERP_AGE_GROUP)) +
+  geom_bar(stat = "identity", width = 1)
+pie <- pie + coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0(round(count/sum(perp_age_data$count)*100), "%")), position = position_stack(vjust = 0.5))
+pie = pie + labs(x = NULL, y = NULL, fill = NULL, title = "Perpetrator Age")
+pie = pie + theme_classic() + theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          plot.title = element_text(hjust = 0.5, color = "#666666"))
+perp_age_pie <-pie
+perp_sex_data <- shooting_data %>%
+  group_by(PERP_SEX) %>%
+  summarize(count = n())
+pie <- ggplot(perp_sex_data, aes(x = "", y = count, fill=PERP_SEX)) +
+  geom_bar(stat = "identity", width = 1)
+pie <- pie + coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0(round(count/sum(perp_sex_data$count)*100), "%")), position = position_stack(vjust = 0.5))
+pie = pie + labs(x = NULL, y = NULL, fill = NULL, title = "Perpetrator Sex")
+pie = pie + theme_classic() + theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          plot.title = element_text(hjust = 0.5, color = "#666666"))
+perp_sex_pie <- pie
+vic_age_pie
+perp_age_pie
+vic_race_pie
+perp_race_pie
+vic_sex_pie
+perp_sex_pie
+```
+The most most common attributes of victims and offenders of NYPD shooting incidents are:
+
+<center>
+
+```{r common_attributes, echo = FALSE}
+print("Victim: ")
+names(which.max(table(shooting_data$VIC_AGE_GROUP)))
+names(which.max(table(shooting_data$VIC_SEX)))
+names(which.max(table(shooting_data$VIC_RACE)))
+print("Perpetrator:")
+names(which.max(table(shooting_data$PERP_AGE_GROUP)))
+names(which.max(table(shooting_data$PERP_SEX)))
+names(which.max(table(shooting_data$PERP_RACE)))
+```
+Analyze Locations of Shooting Incidents:
+
+-Group by Location and summarize
+
+- Plot as a bar graph
+```{r location_pie}
+sum_loc <- shooting_data %>% group_by(location = LOCATION_DESC) %>% summarise(count = n())
+sum_loc <- sum_loc[order(sum_loc$count),]
+sum_loc <- sum_loc[- grepl("NA", sum_loc$location),]
+#sum_loc <- sum_loc %>% arrange(desc(sum_loc$count))
+#sub_loc <- tail(sum_loc, 10)
+sub_loc <- tail(na.omit(sum_loc), 5)
+sub_loc_m <- as.matrix(sub_loc[-1])
+rownames(sub_loc_m) <- sub_loc$location
+barplot(sub_loc_m[,'count'], las = 2)
+```
+It looks like the two most common locations for shooting incidents in New York (other than entries with N/A listed) are Multi Dwelling locations such as Apartment buildings and next highest is a private home.
+
+## ANALYZE
+
+Lets analyze how the number of Shooting Incidents changes each year. 
+```{r analyze}
+change_by_year <- incident_by_year %>%
+  mutate(year_delta = ((year_count - lag(year_count))/lag(year_count))*100) %>%
+  select(-c(year_count))
+
+barplot(t(as.matrix(change_by_year)), las = 2,  main = "Percent Change From Previous Year Since 2006", cex.names = 0.2)
+```
+As you can see from the graph above, there was an over 100% increase in the number of shooting incidents in 2020. This is by far the greatest increase in over 15 years with no other years increasing by more than 30%.
+
+
+This data was collected quarterly and reviewed by the Office of Management Analysis and Planning. This could be a possible source of bias in the data posted. 
+
+
+In my analysis of NYPD Shooting incident data I focused on victim and perpertrator attributes and trends of shooting incidents by year. The data ranged from 2006 to the present, and included various attributes such as where and when the incident occurred, what age, race and sex the victim and perpetrator were, and what neighborhood and type of location the incident occured at. I chose to examine more closely the victims, their age, sex, race, and the amount of shooting incidents over time. I found out that the majority of victims and perpetrators in shooting incidents in new york city are black males between the ages of 18 and 44. Also, an interesting statistic that I found out is that 9% of victims are female but only 1% of perpetrators are female. I also looked into the trends of shooting incidents over the years since 2006. There was a larger than 100% increase in shooting incidents from 2019 to 2020. I do not know the cause of this spike but based on my knowledge of current events at the time I would guess it could be related to riots or the COVID-19 pandemic. OVerall this was a great assignment and with no prior experience using r, I learned a alot! 
